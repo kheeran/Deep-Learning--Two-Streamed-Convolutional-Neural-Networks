@@ -1,0 +1,116 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Applied Deep Learning Coursework}
+
+\author{\IEEEauthorblockN{Kheeran Naidu}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University of Bristol}\\
+kn16063@bristol.ac.uk}
+\and
+\IEEEauthorblockN{Adam Pluck}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{University of Bristol}\\
+ap16894@bristol.ac.uk}
+\and
+\IEEEauthorblockN{Farrel Zulkarnaen}
+\IEEEauthorblockA{\textit{Department of Engineering Mathematics} \\
+\textit{University of Bristol}\\
+fz16336@bristol.ac.uk}
+
+}
+
+\maketitle
+
+% --------------------------------------------------------------------------------
+% \begin{abstract}
+% This document is a model and instructions for \LaTeX.
+% This and the IEEEtran.cls file define the components of your paper [title, text, heads, etc.]. *CRITICAL: Do Not Use Symbols, Special Characters, Footnotes, 
+% or Math in Paper Title or Abstract.
+% \end{abstract}
+% \begin{IEEEkeywords}
+% Keywords
+% \end{IEEEkeywords}
+
+% --------------------------------------------------------------------------------
+\section{Introduction}
+Definition of the problem addressed by the paper Su et al
+
+% --------------------------------------------------------------------------------
+\section{Related Work}
+A summary of published papers attempting to address the same problem (up to 3 works). These could be from the references of the paper itself, or otherwise. 
+
+% --------------------------------------------------------------------------------
+\section{Dataset}
+A description of the dataset used, training/test split size, labels and file formats
+
+% --------------------------------------------------------------------------------
+\section{Input}
+Explain the LMC and MC inputs used. Give 1-2 examples visually from your data, by plotting these as images. Do not use the figure from the original paper. 
+
+% --------------------------------------------------------------------------------
+\section{Architecture (Su et Al)}
+Summarise the 4-conv architecture’s details, in writing, through a table or a diagram (only one of these). Detail your findings of where the paper’s inconsistencies are, and how you went around resolving these. 
+
+% --------------------------------------------------------------------------------
+\section{Implementation Details}
+Summary of the steps you have undertaken to replicate the results, train the data and obtain the results, including any decisions you needed to make along the way. Do not include any pieces of code, but you can include pseudo-codes if needed. 
+
+% --------------------------------------------------------------------------------
+\section{Replicating Quantitative Results}
+Your table 2 replication results. 
+
+% --------------------------------------------------------------------------------
+\section{Training Curves}
+Include your training/test loss (and avg accuracy) curves for your models, and comment on any overfitting in your training. The tables here should correspond to the same run as those in the reported table (Section H). These curves could be directly retrieved from Tensorboard. 
+
+% --------------------------------------------------------------------------------
+\section{Qualitative Results}
+This section should include sample success and failure cases based on your algorithm. In presenting these examples, you can plot/display the inputs(s) in each case. Particularly: (a) find one or more examples that are correctly classified by both LMCNet and MCNet. (b) find at least one case where one input is correct while the other is incorrect. (c) find one case where late fusion outperforms individual inputs, (d) find one example where all methods fail. 
+
+% --------------------------------------------------------------------------------
+\section{Improvements}
+Using the same 4-conv layer architecture, propose, implement and test one potential improvement you made to your results (i.e. do not use the 6-conv or 8-conv). Note: if you describe multiple improvements, we will give you the lower mark (rather than the higher one), so choose the one you believe in. Cover any implementation details required to understand and replicate your modifications. Report your improved results in tabular format for all metrics. Do not include any pieces of code, but you can include pseudo-codes if needed. Note: any improvements should be made using the same dataset, train/test split and evaluation metrics used earlier. Improvements can include changes to architecture, hyper-parameters and learning algorithm. Your choice should be justified theoretically and experimentally. 
+
+% --------------------------------------------------------------------------------
+\section{Conclusion and Future Works}
+Summarise what your report contains in terms of content and achievements. 
+Suggest future work that might extend, generalise or improve the results in your report. 
+
+% --------------------------------------------------------------------------------
+
+
+% \section*{References}
+% Please number citations consecutively within brackets \cite{b1}. The 
+% sentence punctuation follows the bracket \cite{b2}. Refer simply to the reference 
+% number, as in \cite{b3}---do not use ``Ref. \cite{b3}'' or ``reference \cite{b3}'' except at 
+% the beginning of a sentence: ``Reference \cite{b3} was the first $\ldots$''
+
+% Number footnotes separately in superscripts. Place the actual footnote at 
+% the bottom of the column in which it was cited. Do not put footnotes in the 
+% abstract or reference list. Use letters for table footnotes.
+
+% Unless there are six authors or more give all authors' names; do not use 
+% ``et al.''. Papers that have not been published, even if they have been 
+% submitted for publication, should be cited as ``unpublished'' \cite{b4}. Papers 
+% that have been accepted for publication should be cited as ``in press'' \cite{b5}. 
+% Capitalize only the first word in a paper title, except for proper nouns and 
+% element symbols.
+
+% For papers published in translation journals, please give the English 
+% citation first, followed by the original foreign-language citation \cite{b6}.
+
+\begin{thebibliography}{00}
+\bibitem{b1} Y. Sung, K. Zhang, J Wang and K Madani. ``Environment sound classification using a two-Stream CNN based on decision-level fusion.'' In Sensors 19(7), 2019.
+\end{thebibliography}
+\end{document}
