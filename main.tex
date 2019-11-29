@@ -7,9 +7,16 @@
 \usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{mathtools}
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
+
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
+
+
 
 \title{Applied Deep Learning Coursework}
 
@@ -58,6 +65,22 @@ Pg 7 Experiment and Analysis:
 
 ``The UrbanSound8K dataset includes 8732 labeled urban sounds (the length is less than or equal to 4 s) collected from the real-world, totaling 9.7 h. The dataset is separated into 10 audio event classes: air conditioner (ac), car horn (ch), children playing (cp), dog bark (db), drilling (dr), engine idling (ei),gunshot (gs), jackhammer (jh), siren (si) and street music (sm).''
 
+We then use feature
+
+Our dataset is comprised of 8732 sounds labelled as one of the following 10 classes:
+
+\begin{itemize}
+    \item air conditioner (ac)
+    \item car horn (ch)
+    \item children playing (cp)
+    \item dog bark (db)
+    \item drilling (dr)
+    \item engine idiling (ei)
+    \item gunshot (gs)
+    \item jackhammer (jh)
+    \item siren (si)
+    \item street music (sm)
+\end{itemize}
 
 
 
@@ -69,7 +92,41 @@ Explain the LMC and MC inputs used. Give 1-2 examples visually from your data, b
 \section{Architecture (Su et Al)}
 Summarise the 4-conv architecture’s details, in writing, through a table or a diagram (only one of these). Detail your findings of where the paper’s inconsistencies are, and how you went around resolving these. 
 
-Notes:
+\subsection{Inconsistencies/errors:}
+
+
+
+Confusion with stride length maybe?
+
+\href{https://machinelearningmastery.com/padding-and-stride-for-convolutional-neural-networks/}{useful link for padding and stride}
+In figure 4 conv1 to conv 2 has same dimensions so surely 2x2 stride mentioned in 3.2 doesn't make sense?
+conv2 to conv3 has 2x2 max pooling, halving dimensions which makes sense with architecture
+3.2 again mentions a stride of 2x2 conv3 to conv4 but dimensions stay the same?
+
+Either stride is wrong with padding 1 or stride is correct but padding is 2
+
+i.e stride 2x2 halves it then the padding doubles it keeping the dimensions the same after conv
+or we have stride of 1 which doesn't have keeping the dimensions the same after conv
+
+note stride of 2x2 in conv4 could be correct as input is 21x43 in figure 4, and at bottom of page 7 it says ``features with size of 11x22 are derived from the last hidden layer and feed to the fully-connected layer''
+
+In figure 2, they don't specify the dimensions of the first bit
+
+For a matrix of size $n\times m$ the output size after applying a kernel of size $f_{n}\times f_{m}$ would be:
+
+\begin{equation}
+    n_{output} = \floor{\frac{n+2p-f_{n}}{s} + 1}
+\end{equation}
+
+\begin{equation}
+    m_{output} = \floor{\frac{m+2p-f_{m}}{s} + 1}
+\end{equation}
+
+where $p$ is the number of padding and $s$ is the number of stride
+\\
+
+Using the equations above we can deduce that the correct value for padding and the stride in order to achieved the specified output shape given in the paper. Using this formula as well we can further conclude that inconsistency found in the original paper was either that of a misspecified stride or padding value. In the paper it was stated that they used a stride of 2, but this will not lead the correctly specified output shape for the next layer. To retcon this mistake we believe that $p=1$ and $s=1$. Or alternative if we believe that the stride value is correct, i.e. $s=2$, as it is in the paper, then the required padding value would be 21 across and 43 down.
+
 
 
 
