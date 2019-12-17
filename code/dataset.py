@@ -9,17 +9,29 @@ class UrbanSound8KDataset(data.Dataset):
         self.mode = mode
 
     def __getitem__(self, index):
+
+        dataset = np.array(self.dataset)
+
+        LM = dataset[index]["features"]["logmelspec"]
+        MFCC = dataset[index]["features"]["mfcc"]
+        C = dataset[index]["features"]["chroma"]
+        SC = dataset[index]["features"]["spectral_contrast"]
+        T = dataset[index]["features"]["tonnetz"]
+
         if self.mode == 'LMC':
             # Edit here to load and concatenate the neccessary features to
             # create the LMC feature
-            feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
+            LMC = np.concatenate((LM, C, SC, T), axis=0)
+            feature = torch.from_numpy(LMC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MC':
             # Edit here to load and concatenate the neccessary features to
             # create the MC feature
-            feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
+            MC = np.concatenate((MFCC, C, SC, T), axis=0)
+            feature = torch.from_numpy(MC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MLMC':
             # Edit here to load and concatenate the neccessary features to
             # create the MLMC feature
+            MLMC = np.concatenate((MFCC, LM, C, SC, T), axis=0)
             feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
 
         label = self.dataset[index]['classID']
@@ -28,3 +40,6 @@ class UrbanSound8KDataset(data.Dataset):
 
     def __len__(self):
         return len(self.dataset)
+
+dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_train.pkl", "LMC")
+print(dataset_train_LMC.__getitem__(0))
