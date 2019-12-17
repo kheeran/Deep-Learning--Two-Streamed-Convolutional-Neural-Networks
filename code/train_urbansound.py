@@ -437,6 +437,25 @@ def main(args):
     # Defining the SGD optimised used
     optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum)
 
+    # Write logs to directory
+    log_dir = get_summary_writer_log_dir(args)
+    print(f"Writing logs to {log_dir}")
+    summary_writer = SummaryWriter(
+            str(log_dir),
+            flush_secs=5
+    )
+
+    # Train the model
+    trainer = Trainer(model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE)
+    trainer.train(
+        args.epochs,
+        args.val_frequency,
+        print_frequency=args.print_frequency,
+        log_frequency=args.log_frequency,
+    )
+
+    summary_writer.close()
+
 # Log directory management
 def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
     """Get a unique directory that hasn't been logged to before for use with a TB
@@ -458,3 +477,8 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
             return str(tb_log_dir)
         i += 1
     return str(tb_log_dir)
+
+if __name__ == "__main__":
+    start = time.time()
+    main(parser.parse_args())
+    print ("Total time taken: {}".format(time.time() - start))
