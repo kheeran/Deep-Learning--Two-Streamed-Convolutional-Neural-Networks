@@ -35,13 +35,13 @@ parser.add_argument(
 )
 parser.add_argument(
     "--epochs",
-    default=20,
+    default=50,
     type=int,
     help="Number of epochs (passes through the entire dataset) to train for",
 )
 parser.add_argument(
     "--val-frequency",
-    default=2,
+    default=5,
     type=int,
     help="How frequently to test the model on the validation set in number of epochs",
 )
@@ -53,7 +53,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--print-frequency",
-    default=10,
+    default=300,
     type=int,
     help="How frequently to print progress to the command line in number of steps",
 )
@@ -89,10 +89,10 @@ class SoundShape(NamedTuple): # 45*85*1
 # Use GPU if cuda is available
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
-    print ("Using CUDA...")
+    print("Using CUDA...")
 else:
     DEVICE = torch.device("cpu")
-    print ("Using CPU...")
+    print("Using CPU...")
 
 # The Dataset class
 class UrbanSound8KDataset(data.Dataset):
@@ -485,4 +485,4 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
 if __name__ == "__main__":
     start = time.time()
     main(parser.parse_args())
-    print ("Total time taken: {}".format(time.time() - start))
+    print("Total time taken: {}".format(time.time() - start))
