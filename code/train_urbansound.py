@@ -52,6 +52,12 @@ parser.add_argument(
     help="How frequently to save logs to tensorboard in number of steps",
 )
 parser.add_argument(
+    "--print-frequency",
+    default=10,
+    type=int,
+    help="How frequently to print progress to the command line in number of steps",
+)
+parser.add_argument(
     "-j",
     "--worker-count",
     default=cpu_count(),
@@ -67,6 +73,12 @@ parser.add_argument(
     "--dropout",
     default=0.5,
     type=float,
+)
+parser.add_argument(
+    "--mode",
+    default="LMC",
+    type=str,
+    help="The type of data to train the network on (LMC, MC, MLMC)"
 )
 
 class SoundShape(NamedTuple): # 45*85*1
@@ -178,7 +190,7 @@ class CNN(nn.Module):
             num_features=64
         )
 
-        self.fc1 = nn.Linear(15488, 1024)
+        self.fc1 = nn.Linear(13440, 1024) # initially calculated 15488
         self.initialise_layer(self.fc1)
         self.bnormfc1 = nn.BatchNorm1d(
             num_features = 1024
@@ -217,10 +229,10 @@ class CNN(nn.Module):
         # Fully Conected Layer 1 (do we put dropout on both FC layers?)
         x = self.fc1(self.dropout(x))
         x = self.bnormfc1(x) # This was not in the paper
-        x = F.sigmoid(x)
+        x = torch.sigmoid(x)
 
         # Fully Conected Layer 2 (do we put dropout on both FC layers?)
-        x = self.fc2(self.dropout(x))
+        x = self.fcout(self.dropout(x))
 
         return x
 
@@ -411,8 +423,8 @@ def main(args):
     )
 
     # Load and prepare the data
-    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", "LMC")
-    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
+    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
+    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
@@ -436,14 +448,6 @@ def main(args):
 
     # Defining the SGD optimised used
     optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum)
-
-    # Write logs to directory
-    log_dir = get_summary_writer_log_dir(args)
-    print(f"Writing logs to {log_dir}")
-    summary_writer = SummaryWriter(
-            str(log_dir),
-            flush_secs=5
-    )
 
     # Train the model
     trainer = Trainer(model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE)
@@ -469,7 +473,7 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         from getting logged to the same TB log directory (which you can't easily
         untangle in TB).
     """
-    tb_log_dir_prefix = (f'CNN_bn_dropout={args.dropout}_bs={args.batch_size}_lr={args.learning_rate}_momentum={args.momentum}_brightness={args.data_aug_brightness}_rotation={args.data_aug_rotation}' + ("_hflip" if args.data_aug_hflip else "") + '_run_')
+    tb_log_dir_prefix = (f'CNN_bn_dropout={args.dropout}_bs={args.batch_size}_lr={args.learning_rate}_momentum={args.momentum}_run_')
     i = 0
     while i < 1000:
         tb_log_dir = args.log_dir / (tb_log_dir_prefix + str(i))
