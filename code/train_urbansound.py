@@ -309,7 +309,7 @@ class Trainer:
                 if ((self.step + 1) % print_frequency) == 0:
                     self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
 
-                # Update loop params for next batch element
+                # Update loop params for next batch
                 self.step += 1
                 data_load_start_time = time.time()
 
@@ -427,7 +427,7 @@ def main(args):
     test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        shuffle=True,
+        shuffle=False,
         batch_size=args.batch_size,
         pin_memory=True,
         num_workers=args.worker_count,
