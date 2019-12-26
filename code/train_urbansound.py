@@ -1,6 +1,7 @@
 import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
+# from torchsummary import summary
 
 import torch
 import torch.backends.cudnn # Backend for using NVIDIA CUDA
@@ -153,23 +154,24 @@ class CNN(nn.Module):
 
         self.conv2 = nn.Conv2d(
             in_channels=32,
-            out_channels=64,
+            out_channels=32,
             kernel_size=(3,3),
             padding=(1,1),
         )
         self.initialise_layer(self.conv2)
 
         self.bnorm2 = nn.BatchNorm2d(
-            num_features=64
+            num_features=32
         )
         # Pooling Layer with stride to half the output
         self.pool2 = nn.MaxPool2d(
             kernel_size=(2,2),
             stride=(2,2),
+            padding=(1,1),
         )
 
         self.conv3 = nn.Conv2d(
-            in_channels=64,
+            in_channels=32,
             out_channels=64,
             kernel_size=(3,3),
             padding=(1,1),
@@ -190,7 +192,7 @@ class CNN(nn.Module):
             num_features=64
         )
 
-        self.fc1 = nn.Linear(13440, 1024) # initially calculated 15488
+        self.fc1 = nn.Linear(15488, 1024)
         self.initialise_layer(self.fc1)
         self.bnormfc1 = nn.BatchNorm1d(
             num_features = 1024
@@ -443,14 +445,16 @@ def main(args):
     # Create the CNN model
     model = CNN(height=41, width=85, channels=1, class_count=10, dropout=args.dropout)
 
+    # summary(model, (1,41, 85))
+
     # Define the loss function criterion (softmax cross entropy)
     criterion = nn.CrossEntropyLoss()
 
     # Defining the SGD optimised used
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, nesterov=True)
+    # optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, nesterov=True)
 
     # Trying with adam optimiser instead
-    # optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, betas=(args.momentum, 0.999))
+    optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, betas=(args.momentum, 0.999))
 
     # Train the model
     trainer = Trainer(model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE)
