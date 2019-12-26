@@ -124,7 +124,7 @@ class UrbanSound8KDataset(data.Dataset):
             # Edit here to load and concatenate the neccessary features to
             # create the MLMC feature
             MLMC = np.concatenate((MFCC, LM, C, SC, T), axis=0)
-            feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
+            feature = torch.from_numpy(MLMC.astype(np.float32)).unsqueeze(0)
 
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
@@ -447,7 +447,10 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
 
     # Defining the SGD optimised used
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, nesterov=True)
+
+    # Trying with adam optimiser instead
+    # optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, betas=(args.momentum, 0.999))
 
     # Train the model
     trainer = Trainer(model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE)

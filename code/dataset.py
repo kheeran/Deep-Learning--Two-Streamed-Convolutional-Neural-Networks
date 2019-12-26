@@ -18,6 +18,12 @@ class UrbanSound8KDataset(data.Dataset):
         SC = dataset[index]["features"]["spectral_contrast"]
         T = dataset[index]["features"]["tonnetz"]
 
+        print(MFCC)
+        print(LM)
+        print(C)
+        print(SC)
+        print(T)
+
         if self.mode == 'LMC':
             # Edit here to load and concatenate the neccessary features to
             # create the LMC feature
@@ -32,8 +38,9 @@ class UrbanSound8KDataset(data.Dataset):
             # Edit here to load and concatenate the neccessary features to
             # create the MLMC feature
             MLMC = np.concatenate((MFCC, LM, C, SC, T), axis=0)
-            feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
+            feature = torch.from_numpy(MLMC.astype(np.float32)).unsqueeze(0)
 
+        print(feature)
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
         return feature, label, fname
