@@ -234,7 +234,7 @@ class CNN(nn.Module):
         x = torch.sigmoid(x)
 
         # Fully Conected Layer 2 (do we put dropout on both FC layers?)
-        x = self.fcout(self.dropout(x))
+        x = self.fcout(x)
 
         return x
 
