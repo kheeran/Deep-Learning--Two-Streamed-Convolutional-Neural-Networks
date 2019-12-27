@@ -146,7 +146,7 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
 
     # Define the optimizer
-    optimizer = optim.AdamW(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999))
+    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999))
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
