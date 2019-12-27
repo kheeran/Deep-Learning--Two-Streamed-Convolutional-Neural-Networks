@@ -23,16 +23,27 @@ torch.backends.cudnn.benchmark = True
 
 # Add argument parser
 parser = argparse.ArgumentParser(
-    description="Train a CNN on UrbanSound8K",
+    description="Train a simple CNN on CIFAR-10",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("--log-dir", default=Path("logs"), type=Path)
-parser.add_argument("--learning-rate", default=1e-3, type=float, help="Learning rate")
+
+# Add arguments to parse
+parser.add_argument(
+    "--log-dir",
+    default=Path("logs"),
+    type=Path
+    )
+parser.add_argument(
+    "--learning-rate",
+    default=1e-3,
+    type=float,
+    help="Learning rate"
+    )
 parser.add_argument(
     "--batch-size",
     default=32,
     type=int,
-    help="Size of mini-batches for SGD",
+    help="Number of images within each mini-batch",
 )
 parser.add_argument(
     "--epochs",
@@ -82,7 +93,8 @@ parser.add_argument(
     help="The type of data to train the network on (LMC, MC, MLMC)"
 )
 
-class SoundShape(NamedTuple): # 45*85*1
+
+class DataShape(NamedTuple): # 45*85*1
     height: int
     width: int
     channels: int
@@ -90,57 +102,122 @@ class SoundShape(NamedTuple): # 45*85*1
 # Use GPU if cuda is available
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
-    print("Using CUDA...")
+    print ("Using CUDA...")
 else:
     DEVICE = torch.device("cpu")
-    print("Using CPU...")
+    print ("Using CPU...")
+
+
+# Main function loop for training and testing the data
+def main(args):
+
+    # Load and prepare the data
+
+    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
+    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        shuffle=True,
+        batch_size=args.batch_size,
+        pin_memory=True,
+        num_workers=args.worker_count,
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset,
+        shuffle=False,
+        batch_size=args.batch_size,
+        num_workers=args.worker_count,
+        pin_memory=True,
+    )
+
+    # Get the dimensions of the data
+    data_height = train_dataset.__getitem__(0)[0].shape[2]
+    data_width = train_dataset.__getitem__(0)[0].shape[1]
+    data_channels = train_dataset.__getitem__(0)[0].shape[0]
+
+    # Define the CNN model
+    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout)
+
+    # Running Torch Summary to check the architecture
+    # summary(model, (data_channels,data_height,data_width))
+
+    # Define the criterion to be softmax cross entropy
+    criterion = nn.CrossEntropyLoss()
+
+    # Define the optimizer
+    optimizer = optim.AdamW(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999))
+
+    # Setup directory for the logs
+    log_dir = get_summary_writer_log_dir(args)
+    print(f"Writing logs to {log_dir}")
+
+    # Define the summary writer for logging
+    summary_writer = SummaryWriter(
+            str(log_dir),
+            flush_secs=5
+    )
+
+    # Define the model trainer
+    trainer = Trainer(
+        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE
+    )
+
+    # Use the trainer to train the model
+    trainer.train(
+        args.epochs,
+        args.val_frequency,
+        print_frequency=args.print_frequency,
+        log_frequency=args.log_frequency,
+    )
+
+    # Close the summary writer at the end of the training
+    summary_writer.close()
 
 # The Dataset class
 class UrbanSound8KDataset(data.Dataset):
     def __init__(self, dataset_path, mode):
+
+        # Load the dataset
         self.dataset = pickle.load(open(dataset_path, 'rb'))
         self.mode = mode
 
     def __getitem__(self, index):
 
-        dataset = np.array(self.dataset)
+        # Extract the necessary features from the loaded dataset
+        LM = self.dataset[index]["features"]["logmelspec"]
+        MFCC = self.dataset[index]["features"]["mfcc"]
+        C = self.dataset[index]["features"]["chroma"]
+        SC = self.dataset[index]["features"]["spectral_contrast"]
+        T = self.dataset[index]["features"]["tonnetz"]
 
-        LM = dataset[index]["features"]["logmelspec"]
-        MFCC = dataset[index]["features"]["mfcc"]
-        C = dataset[index]["features"]["chroma"]
-        SC = dataset[index]["features"]["spectral_contrast"]
-        T = dataset[index]["features"]["tonnetz"]
-
+        # Appropriately prepare the data given the selected mode
         if self.mode == 'LMC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the LMC feature
             LMC = np.concatenate((LM, C, SC, T), axis=0)
             feature = torch.from_numpy(LMC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the MC feature
             MC = np.concatenate((MFCC, C, SC, T), axis=0)
             feature = torch.from_numpy(MC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MLMC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the MLMC feature
             MLMC = np.concatenate((MFCC, LM, C, SC, T), axis=0)
             feature = torch.from_numpy(MLMC.astype(np.float32)).unsqueeze(0)
-
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
-        return feature, label
+
+        return feature, label#, fname
 
     def __len__(self):
         return len(self.dataset)
 
-# The model class
 class CNN(nn.Module):
-    def __init__(self, height: int, width: int, channels:int, class_count: int, dropout: float):
+    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float):
         super().__init__()
-        self.input_shape = SoundShape(height=height, width=width, channels=channels)
+
+        # Define data shape and number of classes
+        self.input_shape = DataShape(height=height, width=width, channels=channels)
         self.class_count = class_count
 
+        # Defining the first convolutional layer & initialising its weights using Kaiming
         self.conv1 = nn.Conv2d(
             in_channels=self.input_shape.channels,
             out_channels=32,
@@ -148,42 +225,49 @@ class CNN(nn.Module):
             padding=(1,1),
         )
         self.initialise_layer(self.conv1)
+
+        # Defining batch normalisation of the outputs of the first conv layer
         self.bnorm1 = nn.BatchNorm2d(
             num_features=32
         )
 
+        # Defining the second convolutional layer & initialising its weights using Kaiming
         self.conv2 = nn.Conv2d(
-            in_channels=32,
-            out_channels=32,
-            kernel_size=(3,3),
-            padding=(1,1),
+            in_channels = 32,
+            out_channels = 32,
+            kernel_size = (3, 3),
+            padding = (1, 1),
         )
         self.initialise_layer(self.conv2)
 
+        # Defining batch normalisation of the outputs of the second conv layer
         self.bnorm2 = nn.BatchNorm2d(
-            num_features=32
-        )
-        # Pooling Layer with stride to half the output
-        self.pool2 = nn.MaxPool2d(
-            kernel_size=(2,2),
-            padding=(1,1),
-            stride=(2,2),
+            num_features = 32
         )
 
+        # Defining the pooling layer for the batch normalised 2nd conv output
+        self.pool2 = nn.MaxPool2d(
+            kernel_size=(2, 2),
+            padding=(1,1),
+            stride=(2, 2)
+        )
+
+        # Defining the third convolutional layer & initialising its weights using Kaiming
         self.conv3 = nn.Conv2d(
             in_channels=32,
             out_channels=64,
             kernel_size=(3,3),
             padding=(1,1),
         )
-
         self.initialise_layer(self.conv3)
 
+        # Defining batch normalisation of the outputs of the third conv layer
         self.bnorm3 = nn.BatchNorm2d(
             num_features=64
         )
 
-        # Could use Max Pooling for the last layer, but probably more likely to be stride
+        # Defining the fourth convolutional layer & initialising its weights using Kaiming
+        # Could use Max Pooling for the last layer, but probably more likely to be stride (from the paper)
         self.conv4 = nn.Conv2d(
             in_channels=64,
             out_channels=64,
@@ -191,68 +275,73 @@ class CNN(nn.Module):
             padding=(1,1),
             stride=(2,2),
         )
-
         self.initialise_layer(self.conv4)
 
+        # Defining batch normalisation of the outputs of the fourth conv layer
         self.bnorm4 = nn.BatchNorm2d(
             num_features=64
         )
 
-        self.fc1 = nn.Linear(15488, 1024)
+        # Defining the first fully connected layer & initialising the weights using Kaiming
+        self.fc1 = nn.Linear (15488, 1024)
         self.initialise_layer(self.fc1)
+
+        # Defining batch normalisation of the outputs of the first fully connected layer
         self.bnormfc1 = nn.BatchNorm1d(
             num_features = 1024
         )
 
-        self.fcout = nn.Linear (1024, 10)
-        self.initialise_layer(self.fcout)
+        # Defining the final fully connected layer to 10 classes & initialising the weights using Kaiming
+        self.fc2 = nn.Linear (1024, 10)
+        self.initialise_layer(self.fc2)
 
+        # Defining the dropout used in the CNN
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, sounds: torch.Tensor) -> torch.Tensor:
-        # Hidden Layer 1
-        x = self.conv1(sounds)
+    def forward(self, input_data: torch.Tensor) -> torch.Tensor:
+
+        # Implementing the first conv hidden layer
+        x = self.conv1(input_data)
         x = self.bnorm1(x)
         x = F.relu(x)
 
-        # Hidden Layer 2
+        # Implementing the second conv hidden layer
         x = self.conv2(self.dropout(x))
         x = self.bnorm2(x)
         x = F.relu(x)
+
+        # Implementing a pooling stage to the outputs of the first layer
         x = self.pool2(x)
 
-        # Hidden Layer 3
+        # Implementing the third conv hidden layer
         x = self.conv3(x)
         x = self.bnorm3(x)
         x = F.relu(x)
 
-        # Hidden Layer 4
+        # Implementing the fourth conv hidden layer
         x = self.conv4(self.dropout(x))
         x = self.bnorm4(x)
         x = F.relu(x)
 
-        # Flatten Hidden Layer 4
+        # Flattening the output of the fourth conv layer for the first fc layer
         x = torch.flatten(x, start_dim = 1)
 
-        # Fully Conected Layer 1 (do we put dropout on both FC layers?)
+        # Implementing the first fully connected hidden layer
         x = self.fc1(self.dropout(x))
-        x = self.bnormfc1(x) # This was not in the paper
+        # x = self.bnormfc1(x) # This was not in the paper
         x = torch.sigmoid(x)
 
-        # Fully Conected Layer 2 (do we put dropout on both FC layers?)
-        x = self.fcout(self.dropout(x))
-
+        # Implementing the final fully connected hidden layer
+        x = self.fc2(self.dropout(x))
         return x
 
-
-
-    # Initialise weights using Kaiming
     @staticmethod
     def initialise_layer(layer):
         if hasattr(layer, "bias"):
             nn.init.zeros_(layer.bias)
         if hasattr(layer, "weight"):
             nn.init.kaiming_normal_(layer.weight)
+
 
 class Trainer:
     def __init__(
@@ -280,31 +369,36 @@ class Trainer:
         val_frequency: int,
         print_frequency: int = 20,
         log_frequency: int = 5,
-        start_epoch: int = 0,
+        start_epoch: int = 0
     ):
+        # Setting model to training mode
         self.model.train()
+
+        # Main training loop
         for epoch in range(start_epoch, epochs):
             self.model.train()
+
+            # Extracting requred data from loader
             data_load_start_time = time.time()
             for batch, labels in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
 
-                # Compute the forward pass
+                # Compute the forward pass of the model
                 logits = self.model.forward(batch)
 
-                # Calculate the loss
+                # Calculate the loss of the forward pass
                 loss = self.criterion(logits, labels)
 
-                # Compute backpropogation
+                # Implement backpropogation
                 loss.backward()
 
-                # Update the SGD optimiser parameters and set the update grads to zero again
+                # Update the optimiser parameters and set the update grads to zero again
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 
-                # disabling autograd when calculationg the accuracy
+                # Disabling autograd when calculationg the accuracy
                 with torch.no_grad():
                     preds = logits.argmax(-1)
                     accuracy = compute_accuracy(labels, preds)
@@ -326,7 +420,8 @@ class Trainer:
             if ((epoch + 1) % val_frequency) == 0:
                 self.validate()
 
-    # Printing logs
+
+    # Function used to print the progress
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
         print(
@@ -340,7 +435,7 @@ class Trainer:
 
         )
 
-    # Writing logs
+    # Function used to log the progress
     def log_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         self.summary_writer.add_scalar("epoch", epoch, self.step)
         self.summary_writer.add_scalars(
@@ -360,9 +455,12 @@ class Trainer:
                 "time/data", step_time, self.step
         )
 
+    # Function used to validate the model
     def validate(self):
         results = {"preds": [], "labels": []}
         total_loss = 0
+
+        # Put model in validation mode
         self.model.eval()
 
         # No need to track gradients for validation, we're not optimizing.
@@ -377,15 +475,20 @@ class Trainer:
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(labels.cpu().numpy()))
 
+        # Find the overall accuracy of the model
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
+
+        # Find the class accuracy of the model
         class_accuracy = compute_class_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
 
+        # Compute the average loss
         average_loss = total_loss / len(self.val_loader)
 
+        # Write the progress to the logs
         self.summary_writer.add_scalars(
                 "accuracy",
                 {"test": accuracy},
@@ -396,9 +499,14 @@ class Trainer:
                 {"test": average_loss},
                 self.step
         )
-        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}")
+
+        # Switch model back to evaluation mode
         self.model.train()
 
+        # Print the progress
+        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}")
+
+# Function for computing the overall accuracy of the model
 def compute_accuracy(
     labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
 ) -> float:
@@ -410,6 +518,7 @@ def compute_accuracy(
     assert len(labels) == len(preds)
     return float((labels == preds).sum()) / len(labels)
 
+# Function for computing the class accuracy of the model
 def compute_class_accuracy(labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray], class_count: int = 10) -> float:
     assert len(labels) == len(preds)
     class_accuracy = []
@@ -420,64 +529,8 @@ def compute_class_accuracy(labels: Union[torch.Tensor, np.ndarray], preds: Union
     return class_accuracy
 
 
-def main(args):
 
-    # Setup directory for the logs
-    log_dir = get_summary_writer_log_dir(args)
-    print(f"Writing logs to {log_dir}")
-    summary_writer = SummaryWriter(
-            str(log_dir),
-            flush_secs=5
-    )
-
-    # Load and prepare the data
-    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
-    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset,
-        shuffle=False,
-        batch_size=args.batch_size,
-        pin_memory=True,
-        num_workers=args.worker_count,
-    )
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset,
-        shuffle=False,
-        batch_size=args.batch_size,
-        num_workers=args.worker_count,
-        pin_memory=True,
-    )
-
-    # Create the CNN model
-    data_height = train_dataset.__getitem__(0)[0].shape[2]
-    data_width = train_dataset.__getitem__(0)[0].shape[1]
-    data_channels = train_dataset.__getitem__(0)[0].shape[0]
-
-    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout)
-
-    # summary(model, (1,41, 85))
-
-    # Define the loss function criterion (softmax cross entropy)
-    criterion = nn.CrossEntropyLoss()
-
-    # Defining the SGD optimised used
-    # optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=args.momentum, nesterov=True)
-
-    # Trying with adam optimiser instead
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, betas=(args.momentum, 0.999))
-
-    # Train the model
-    trainer = Trainer(model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE)
-    trainer.train(
-        args.epochs,
-        args.val_frequency,
-        print_frequency=args.print_frequency,
-        log_frequency=args.log_frequency,
-    )
-
-    summary_writer.close()
-
-# Log directory management
+# Function for handling the directory for writing logs to
 def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
     """Get a unique directory that hasn't been logged to before for use with a TB
     SummaryWriter.
@@ -499,7 +552,8 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         i += 1
     return str(tb_log_dir)
 
+# Running the Progamme
 if __name__ == "__main__":
     start = time.time()
     main(parser.parse_args())
-    print("Total time taken: {}".format(time.time() - start))
+    print ("Total time taken: {}".format(time.time() - start))
