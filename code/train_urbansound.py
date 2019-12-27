@@ -137,7 +137,7 @@ def main(args):
     data_channels = train_dataset.__getitem__(0)[0].shape[0]
 
     # Define the CNN model
-    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout)
+    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout, mode=args.mode)
 
     # Running Torch Summary to check the architecture
     # summary(model, (data_channels,data_height,data_width))
@@ -210,12 +210,13 @@ class UrbanSound8KDataset(data.Dataset):
         return len(self.dataset)
 
 class CNN(nn.Module):
-    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float):
+    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float, mode: str):
         super().__init__()
 
         # Define data shape and number of classes
         self.input_shape = DataShape(height=height, width=width, channels=channels)
         self.class_count = class_count
+        self.mode = mode
 
         # Defining the first convolutional layer & initialising its weights using Kaiming
         self.conv1 = nn.Conv2d(
@@ -283,7 +284,10 @@ class CNN(nn.Module):
         )
 
         # Defining the first fully connected layer & initialising the weights using Kaiming
-        self.fc1 = nn.Linear (15488, 1024)
+        if self.mode == "MLMC":
+            self.fc1 = nn.Linear(26048, 1024)
+        else:
+            self.fc1 = nn.Linear (15488, 1024)
         self.initialise_layer(self.fc1)
 
         # Defining batch normalisation of the outputs of the first fully connected layer
