@@ -1,0 +1,9 @@
+LMC
+run 0 - adamw optimiser dropout on fcout
+run 1 - adamw without dropout on fcout
+run 2 - SGD without dropout on fcout (2950272)
+run 3 - adam with dropout on fcout (2951056)
+run 4 - adam with dropout on fcout and initialised conv3 & conv4 layers
+
+MC
+run 0 - adamw with dropout on fcout (2950277)
