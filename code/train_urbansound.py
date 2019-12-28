@@ -223,9 +223,9 @@ class CNN(nn.Module):
             in_channels=self.input_shape.channels,
             out_channels=32,
             kernel_size=(3,3),
-            # padding=(1,1),
-            padding=(43,21),
-            stride=(2,2)
+            padding=(1,1),
+            # padding=(43,21),
+            # stride=(2,2)
         )
         self.initialise_layer(self.conv1)
 
@@ -239,9 +239,9 @@ class CNN(nn.Module):
             in_channels = 32,
             out_channels = 32,
             kernel_size = (3, 3),
-            # padding=(1,1),
-            padding = (43, 21),
-            stride=(2,2)
+            padding=(1,1),
+            # padding = (43, 21),
+            # stride=(2,2)
         )
         self.initialise_layer(self.conv2)
 
@@ -262,9 +262,9 @@ class CNN(nn.Module):
             in_channels=32,
             out_channels=64,
             kernel_size=(3,3),
-            # padding=(1,1),
-            padding = (22,11),
-            stride=(2,2)
+            padding=(1,1),
+            # padding = (22,11),
+            # stride=(2,2)
         )
         self.initialise_layer(self.conv3)
 
