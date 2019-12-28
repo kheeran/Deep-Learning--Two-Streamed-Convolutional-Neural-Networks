@@ -1,7 +1,7 @@
 import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
-from torchsummary import summary
+# from torchsummary import summary
 
 import torch
 import torch.backends.cudnn # Backend for using NVIDIA CUDA
@@ -140,7 +140,7 @@ def main(args):
     model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout, mode=args.mode)
 
     # Running Torch Summary to check the architecture
-    summary(model, (data_channels,data_height,data_width))
+    # summary(model, (data_channels,data_height,data_width))
 
     # Define the criterion to be softmax cross entropy
     criterion = nn.CrossEntropyLoss()
