@@ -1,7 +1,7 @@
 import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
-# from torchsummary import summary
+from torchsummary import summary
 
 import torch
 import torch.backends.cudnn # Backend for using NVIDIA CUDA
@@ -132,15 +132,15 @@ def main(args):
     )
 
     # Get the dimensions of the data
-    data_height = train_dataset.__getitem__(0)[0].shape[2]
-    data_width = train_dataset.__getitem__(0)[0].shape[1]
     data_channels = train_dataset.__getitem__(0)[0].shape[0]
+    data_height = train_dataset.__getitem__(0)[0].shape[1]
+    data_width = train_dataset.__getitem__(0)[0].shape[2]
 
     # Define the CNN model
     model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout, mode=args.mode)
 
     # Running Torch Summary to check the architecture
-    # summary(model, (data_channels,data_height,data_width))
+    summary(model, (data_channels,data_height,data_width))
 
     # Define the criterion to be softmax cross entropy
     criterion = nn.CrossEntropyLoss()
@@ -223,9 +223,9 @@ class CNN(nn.Module):
             in_channels=self.input_shape.channels,
             out_channels=32,
             kernel_size=(3,3),
-            padding=(1,1),
-            # padding=(21,43),
-            # stride=(2,2)
+            # padding=(1,1),
+            padding=(43,21),
+            stride=(2,2)
         )
         self.initialise_layer(self.conv1)
 
@@ -239,9 +239,9 @@ class CNN(nn.Module):
             in_channels = 32,
             out_channels = 32,
             kernel_size = (3, 3),
-            padding=(1,1),
-            # padding = (21, 43),
-            # stride=(2,2)
+            # padding=(1,1),
+            padding = (43, 21),
+            stride=(2,2)
         )
         self.initialise_layer(self.conv2)
 
@@ -262,9 +262,9 @@ class CNN(nn.Module):
             in_channels=32,
             out_channels=64,
             kernel_size=(3,3),
-            padding=(1,1),
-            # padding = (11,22),
-            # stride=(2,2)
+            # padding=(1,1),
+            padding = (22,11),
+            stride=(2,2)
         )
         self.initialise_layer(self.conv3)
 
