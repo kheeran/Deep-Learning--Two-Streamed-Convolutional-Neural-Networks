@@ -146,7 +146,7 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
 
     # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=args.learning_rate*(1e-1))
+    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.001)
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
@@ -356,7 +356,7 @@ class CNN(nn.Module):
         x = torch.sigmoid(x)
 
         # Implementing the final fully connected hidden layer
-        x = self.fc2(self.dropout(x))
+        x = self.fc2(x)
         return x
 
     @staticmethod
