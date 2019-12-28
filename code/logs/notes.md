@@ -3,13 +3,31 @@ run 0 - fresh run with adam and adding dropout to conv2 and removing bnorm after
 run 1 - now with max pooling instead of stride on conv4 (2952878)
 run 2 - using loads of padding with the strides in the paper (2953195) - failed run
 run 3 - reverting to normal code but with main function at bottom (2953196)
-run 4 - switching height and width and using strides + padding... (2953228)
-run 5 - Data:(C,H,W) and normal padding with no strides (2953230)
+run 4 - switching height and width and using strides + padding... (2953228) - slightly recuded accuracy and overfitting. Worked better than expected
+run 5 - Data:(C,H,W) and normal padding with no strides (2953230) - set as new baseline config
+run 6 - "" and removed bias params (2953276) - did not really make much of a difference, but new baseline config
+run 7 - "" but with AdamW (2953336)
+run 8 - "" but with SGD (2953408)
+run 9 - baseline with Adam and Dropout2d (2953418)
+run 10 - "" with L2 reg (2953425) -meh 
+run 11 - Adam, Dropout1D and L2reg (2953453) - meh
+run 12 - Adam, dropout1D, l2reg and last dropout removed (2953571) -meh 
+run 13 - "" with l2reg smaller (2953574) - meh
+run 14 - "" without l2 reg (2953582)
+run 15 - "" and with smaller beta2 for adam (2953583)
 
 MC
 run 0 - fresh run with adam and adding dropout to conv2 and removing bnorm after fc1 (2952123)
 run 1 - run 1 - now with max pooling instead of stride on conv4 (2952877)
+run 2 - same as LMC run 6 (2953277)
+run 3 - baseline with Adam and Dropout2d (2953419)
+run 4 - "" with L2 reg (2953424)
+run 5 - Adam, Dropout1D and L2reg (2953454)
 
 MLMC
 run 0 - fresh run with adam and adding dropout to conv2 and removing bnorm after fc1 (2952829)
 run 1 - now with max pooling instead of stride on conv4 (2952876)
+run 2 - same as LMC run 6 (2953278)
+run 3 - baseline with Adam and Dropout2d (2953420)
+run 4 - "" with L2 reg (2953423)
+run 5 - Adam, Dropout1D and L2reg (2953455)
