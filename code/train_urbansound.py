@@ -304,7 +304,7 @@ class CNN(nn.Module):
         if self.mode == "MLMC":
             self.fc1 = nn.Linear(26048, 1024)
         else:
-            self.fc1 = nn.Linear (15488, 1024)
+            self.fc1 = nn.Linear(15488, 1024)
         self.initialise_layer(self.fc1)
 
         # Defining batch normalisation of the outputs of the first fully connected layer
