@@ -222,6 +222,7 @@ class CNN(nn.Module):
         self.conv1 = nn.Conv2d(
             in_channels=self.input_shape.channels,
             out_channels=32,
+            bias=False,
             kernel_size=(3,3),
             padding=(1,1),
             # padding=(43,21),
@@ -239,6 +240,7 @@ class CNN(nn.Module):
             in_channels = 32,
             out_channels = 32,
             kernel_size = (3, 3),
+            bias=False,
             padding=(1,1),
             # padding = (43, 21),
             # stride=(2,2)
@@ -262,6 +264,7 @@ class CNN(nn.Module):
             in_channels=32,
             out_channels=64,
             kernel_size=(3,3),
+            bias=False,
             padding=(1,1),
             # padding = (22,11),
             # stride=(2,2)
@@ -281,6 +284,7 @@ class CNN(nn.Module):
             kernel_size=(3,3),
             padding=(1,1),
             stride=(2,2),
+            bias=False,
         )
         self.initialise_layer(self.conv4)
 
@@ -358,7 +362,8 @@ class CNN(nn.Module):
     @staticmethod
     def initialise_layer(layer):
         if hasattr(layer, "bias"):
-            nn.init.zeros_(layer.bias)
+            if layer.bias is not None:
+                nn.init.zeros_(layer.bias)
         if hasattr(layer, "weight"):
             nn.init.kaiming_normal_(layer.weight)
 
