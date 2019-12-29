@@ -146,7 +146,7 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
 
     # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.0005)
+    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.004)
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
@@ -494,6 +494,10 @@ class Trainer:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 logits = self.model(batch)
+                # print(batch)
+                # print(labels)
+                # print(logits)
+                # print(logits.type)
                 loss = self.criterion(logits, labels)
                 total_loss += loss.item()
                 preds = logits.argmax(dim=-1).cpu().numpy()
