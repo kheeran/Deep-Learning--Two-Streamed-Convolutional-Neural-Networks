@@ -15,6 +15,19 @@ run 12 - Adam, dropout1D, l2reg and last dropout removed (2953571) -meh
 run 13 - "" with l2reg smaller (2953574) - meh
 run 14 - "" without l2 reg (2953582)
 run 15 - "" and with smaller beta2 for adam (2953583)
+run 16 - "" normal beta but l2reg = 0.0005 (2953608) - seems similar to the best config so far
+run 17 - "" repeat (2953682)
+run 18 - weight_decay(l2reg)=0.0006 (2953684)
+run 19 - '' repeat (2953685)
+run 20 - l2=0.0004 (2953686)
+run 21 - "" repeat (2953687)
+run 22 - l2=0.0003 (2953688)
+run 23 - "" (2953689)
+run 24 - l2=0.0007 (2953691)
+run 25 - "" (2953692)
+run 26 - l2=0.1 (2953699)
+run 27 - l2=0.004 (2953789)
+run 28 - "" (2953790)
 
 MC
 run 0 - fresh run with adam and adding dropout to conv2 and removing bnorm after fc1 (2952123)
