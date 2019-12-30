@@ -142,11 +142,14 @@ def main(args):
     # Running Torch Summary to check the architecture
     # summary(model, (data_channels,data_height,data_width))
 
+    # Define the unbalanced class weight of the data and move it to the appropriate device
+    data_weight = torch.Tensor(6299/(np.array([6295,1825,6248,5121,5682,6282,1112,5886,5819,6299]))).to(DEVICE)
+    print(data_weight)
     # Define the criterion to be softmax cross entropy
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=data_weight)
 
     # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.004)
+    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.0005)
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
@@ -204,7 +207,7 @@ class UrbanSound8KDataset(data.Dataset):
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
 
-        return feature, label#, fname
+        return feature, label, fname
 
     def __len__(self):
         return len(self.dataset)
@@ -405,7 +408,7 @@ class Trainer:
 
             # Extracting requred data from loader
             data_load_start_time = time.time()
-            for batch, labels in self.train_loader:
+            for batch, labels, fname in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
@@ -490,19 +493,30 @@ class Trainer:
 
         # No need to track gradients for validation, we're not optimizing.
         with torch.no_grad():
-            for batch, labels in self.val_loader:
+            for batch, labels, fname in self.val_loader:
+
+                # Shifting batch and labels to appropriate device for efficiency
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
+
+                # Calculating the logits of the testing batch
                 logits = self.model(batch)
-                # print(batch)
-                # print(labels)
-                # print(logits)
-                # print(logits.type)
-                loss = self.criterion(logits, labels)
+
+                # Averaging the logits by fname and making with new labels
+                fname_logits, fname_labels = orderbyfname(labels,fname,logits)
+                fname_logits = fname_logits.to(self.device)
+                fname_labels = fname_labels.to(self.device)
+
+                # Calculating loss with new logits and labels
+                loss = self.criterion(fname_logits, fname_labels)
                 total_loss += loss.item()
-                preds = logits.argmax(dim=-1).cpu().numpy()
+
+                # Getting predictions of new logits
+                preds = fname_logits.argmax(dim=-1).cpu().numpy()
+
+                # Appending results
                 results["preds"].extend(list(preds))
-                results["labels"].extend(list(labels.cpu().numpy()))
+                results["labels"].extend(list(fname_labels.cpu().numpy()))
 
         # Find the overall accuracy of the model
         accuracy = compute_accuracy(
@@ -534,6 +548,21 @@ class Trainer:
 
         # Print the progress
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}")
+
+# Function for averaging the logits and proucing new labels from old
+def orderbyfname(labels,fname,logits):
+    fname_set = set(fname)
+    new_logits = []
+    new_labels = []
+    for name in fname_set:
+        indices = np.where(np.array(fname)==name)[0]
+        sum = np.zeros(10)
+        for i in indices:
+            sum += np.array(logits[i].cpu())
+        sum = sum/len(indices)
+        new_logits.append(sum)
+        new_labels.append(labels[indices[0]])
+    return torch.Tensor(new_logits).type(torch.float), torch.Tensor(new_labels).type(torch.long)
 
 # Function for computing the overall accuracy of the model
 def compute_accuracy(
