@@ -1,9 +1,10 @@
 Add more dropouts to help overfitting
 
-Use more pooling layers
+Use more pooling layers - can't until the reached the benchmark
 
 Implement the combining of data streams
 
+Confirm testing is being done right. validation with fnames
 
 
 ----------------------------------
