@@ -18,12 +18,6 @@ class UrbanSound8KDataset(data.Dataset):
         SC = dataset[index]["features"]["spectral_contrast"]
         T = dataset[index]["features"]["tonnetz"]
 
-        print(np.sum(MFCC))
-        print(np.sum(LM))
-        print(np.sum(C))
-        print(np.sum(SC))
-        print(np.sum(T))
-
         if self.mode == 'LMC':
             # Edit here to load and concatenate the neccessary features to
             # create the LMC feature
@@ -47,5 +41,13 @@ class UrbanSound8KDataset(data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
-dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_train.pkl", "LMC")
-print(np.sum(np.array(dataset_train_LMC.__getitem__(0)[0])))
+dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
+
+print((dataset_train_LMC.__getitem__(0)[2]))
+
+# labels = np.zeros((10,1))
+# print(labels)
+# for i in range(5395):
+#     labels[dataset_train_LMC.__getitem__(i)[1]] += 1
+#
+# print(labels)
