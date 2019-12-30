@@ -23,7 +23,7 @@ torch.backends.cudnn.benchmark = True
 
 # Add argument parser
 parser = argparse.ArgumentParser(
-    description="Train a simple CNN on CIFAR-10",
+    description="Training a 4-conv-layer CNN on UrbanSound8K",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 
@@ -92,6 +92,18 @@ parser.add_argument(
     type=str,
     help="The type of data to train the network on (LMC, MC, MLMC)"
 )
+parser.add_argument(
+    "--optimiser",
+    default="SGD",
+    type=str,
+    help="The optimiser used (SGD, Adam, AdamW)"
+)
+parser.add_argument(
+    "--weight-decay",
+    default=0.00001,
+    type=float,
+    help="The L2 regularisation decay parameter"
+)
 
 
 class DataShape(NamedTuple): # 45*85*1
@@ -142,17 +154,28 @@ def main(args):
     # Running Torch Summary to check the architecture
     # summary(model, (data_channels,data_height,data_width))
 
-    # Define the unbalanced class weight of the data and move it to the appropriate device
+    # Define the unbalanced class weight of the data and move it to the appropriate device (hardcoded from analysis of the dataset)
     data_weight = torch.Tensor(6299/(np.array([6295,1825,6248,5121,5682,6282,1112,5886,5819,6299]))).to(DEVICE)
-    print(data_weight)
+
     # Define the criterion to be softmax cross entropy
     criterion = nn.CrossEntropyLoss(weight=data_weight)
 
-    # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=0.0005)
+    # Define the optimizer based on parsed arguments
+    if args.optimiser == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=args.weight_decay)
+    elif args.optimiser == "AdamW":
+        optimizer = optim.AdamW(model.parameters(), lr = args.learning_rate, betas = (args.momentum, 0.999), weight_decay=args.weight_decay)
+    elif args.optimiser == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum = args.momentum, weight_decay=args.weight_decay)
+    else:
+        print("Error: Invalid optimiser argument, defaulting to SGD...")
+        optimizer = optim.SGD(model.parameters(), lr = args.learning_rate, momentum = args.momentum, weight_decay=args.weight_decay)
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
+    f = open("logs/notes.md", "a")
+    f.write("Logged to: " + log_dir + "\n")
+    f.close()
     print(f"Writing logs to {log_dir}")
 
     # Define the summary writer for logging
@@ -601,7 +624,7 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         from getting logged to the same TB log directory (which you can't easily
         untangle in TB).
     """
-    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_lr={args.learning_rate}_momentum={args.momentum}_mode={args.mode}_run_')
+    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_optim={args.optimiser}_decay={args.weight_decay}_lr={args.learning_rate}_momentum={args.momentum}_mode={args.mode}_run_')
     i = 0
     while i < 1000:
         tb_log_dir = args.log_dir / (tb_log_dir_prefix + str(i))
