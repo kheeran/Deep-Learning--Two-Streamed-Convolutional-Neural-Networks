@@ -104,6 +104,12 @@ parser.add_argument(
     type=float,
     help="The L2 regularisation decay parameter"
 )
+parser.add_argument(
+    "--TSCNN",
+    default="LMC",
+    type=str,
+    help="Parameter for dealing with TSCNN combining of logits"
+)
 
 
 class DataShape(NamedTuple): # 45*85*1
@@ -187,7 +193,7 @@ def main(args):
 
     # Define the model trainer
     trainer = Trainer(
-        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE, log_dir
+        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE, log_dir, args.TSCNN
     )
 
     # Use the trainer to train the model
@@ -406,6 +412,7 @@ class Trainer:
         summary_writer: SummaryWriter,
         device: torch.device,
         log_dir: str,
+        TSCNN: str,
     ):
         self.model = model.to(device)
         self.device = device
@@ -416,6 +423,7 @@ class Trainer:
         self.summary_writer = summary_writer
         self.step = 0
         self.log_dir = log_dir
+        self.TSCNN = TSCNN
 
     def train(
         self,
@@ -514,12 +522,16 @@ class Trainer:
         results = {"preds": [], "labels": [], "logits": []}
         total_loss = 0
 
+        # Loading data from previous run to combine for TSCNN
+        if self.TSCNN == "MC":
+            results_prev = pickle.load(open("TSCNN_store.pkl", "rb"))
+
         # Put model in validation mode
         self.model.eval()
 
         # No need to track gradients for validation, we're not optimizing.
         with torch.no_grad():
-            for batch, labels, fname in self.val_loader:
+            for i, (batch, labels, fname) in enumerate(self.val_loader):
 
                 # Shifting batch and labels to appropriate device for efficiency
                 batch = batch.to(self.device)
@@ -547,11 +559,11 @@ class Trainer:
                 results["labels"].extend(list(fname_labels.cpu().numpy()))
 
         # Export list for TSCNN combining
-        if False:
+        if self.TSCNN == "LMC":
             pickle.dump(results, open("TSCNN_store.pkl", "wb"))
-        else:
+        elif self.TSCNN == "MC":
             results_old = pickle.load(open("TSCNN_store.pkl", "rb"))
-            print(np.array_equal(results["labels"],results_old["labels"]))
+            print("Sanity-check on batch order: " + str(np.array_equal(results["labels"],results_old["labels"])))
 
         # Find the overall accuracy of the model
         accuracy = compute_accuracy(
