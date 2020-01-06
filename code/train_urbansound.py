@@ -124,7 +124,6 @@ else:
 def main(args):
 
     # Load and prepare the data
-
     train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
     test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
 
@@ -173,9 +172,6 @@ def main(args):
 
     # Setup directory for the logs
     log_dir = get_summary_writer_log_dir(args)
-    f = open("logs/notes.md", "a")
-    f.write("Logged to: " + log_dir + "\n")
-    f.close()
     print(f"Writing logs to {log_dir}")
 
     # Define the summary writer for logging
@@ -184,9 +180,14 @@ def main(args):
             flush_secs=5
     )
 
+    # Prep notes file for reference
+    f = open("logs/notes-sbatch.md", "a")
+    f.write("Logged to: " + log_dir + "\n")
+    f.close()
+
     # Define the model trainer
     trainer = Trainer(
-        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE
+        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE, log_dir
     )
 
     # Use the trainer to train the model
@@ -343,7 +344,7 @@ class CNN(nn.Module):
         self.initialise_layer(self.fc2)
 
         # Defining the dropout used in the CNN
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout2d(p=dropout)
 
     def forward(self, input_data: torch.Tensor) -> torch.Tensor:
 
@@ -404,6 +405,7 @@ class Trainer:
         optimizer: Optimizer,
         summary_writer: SummaryWriter,
         device: torch.device,
+        log_dir: str,
     ):
         self.model = model.to(device)
         self.device = device
@@ -413,6 +415,7 @@ class Trainer:
         self.optimizer = optimizer
         self.summary_writer = summary_writer
         self.step = 0
+        self.log_dir = log_dir
 
     def train(
         self,
@@ -420,7 +423,7 @@ class Trainer:
         val_frequency: int,
         print_frequency: int = 20,
         log_frequency: int = 5,
-        start_epoch: int = 0
+        start_epoch: int = 0,
     ):
         # Setting model to training mode
         self.model.train()
@@ -469,7 +472,7 @@ class Trainer:
             # Write to summary writer at the end of each epoch
             self.summary_writer.add_scalar("epoch", epoch, self.step)
             if ((epoch + 1) % val_frequency) == 0:
-                self.validate()
+                self.validate(epoch, epochs, self.log_dir)
 
 
     # Function used to print the progress
@@ -507,8 +510,8 @@ class Trainer:
         )
 
     # Function used to validate the model
-    def validate(self):
-        results = {"preds": [], "labels": []}
+    def validate(self, epoch, epochs, log_dir):
+        results = {"preds": [], "labels": [], "logits": []}
         total_loss = 0
 
         # Put model in validation mode
@@ -525,7 +528,7 @@ class Trainer:
                 # Calculating the logits of the testing batch
                 logits = self.model(batch)
 
-                # Averaging the logits by fname and making with new labels
+                # Averaging the logits by fname and making the new labels
                 fname_logits, fname_labels = orderbyfname(labels,fname,logits)
                 fname_logits = fname_logits.to(self.device)
                 fname_labels = fname_labels.to(self.device)
@@ -538,8 +541,17 @@ class Trainer:
                 preds = fname_logits.argmax(dim=-1).cpu().numpy()
 
                 # Appending results
+                m = nn.Softmax(dim=-1)
+                results["logits"].extend(list(m(fname_logits)))
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(fname_labels.cpu().numpy()))
+
+        # Export list for TSCNN combining
+        if False:
+            pickle.dump(results, open("TSCNN_store.pkl", "wb"))
+        else:
+            results_old = pickle.load(open("TSCNN_store.pkl", "rb"))
+            print(np.array_equal(results["labels"],results_old["labels"]))
 
         # Find the overall accuracy of the model
         accuracy = compute_accuracy(
@@ -569,12 +581,18 @@ class Trainer:
         # Switch model back to evaluation mode
         self.model.train()
 
-        # Print the progress
+        # Print the progress & exporting the softmaxed logits and labels
+        if (epoch+1) == epochs:
+            f = open("logs/accuracy.md", "a")
+            f.write(log_dir + "\n")
+            f.write(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}\n\n")
+            f.close()
         print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}")
 
 # Function for averaging the logits and proucing new labels from old
 def orderbyfname(labels,fname,logits):
-    fname_set = set(fname)
+    # fname_set = [list(x).sort() for x in set(fname)]
+    fname_set = sorted(set(fname))
     new_logits = []
     new_labels = []
     for name in fname_set:
