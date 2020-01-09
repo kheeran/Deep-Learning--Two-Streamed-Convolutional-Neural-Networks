@@ -106,8 +106,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--TSCNN",
-    default="LMC",
-    type=str,
+    action = 'store_true',
     help="Parameter for dealing with TSCNN combining of logits"
 )
 
@@ -132,7 +131,6 @@ def main(args):
     # Load and prepare the data
     train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
     test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
-
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
@@ -188,12 +186,12 @@ def main(args):
 
     # Prep notes file for reference
     f = open("logs/notes-sbatch.md", "a")
-    f.write("Logged to: " + log_dir + "\n")
+    f.write("Logged to: " + log_dir + (" - TSCNN" if args.TSCNN else f" - storing {args.mode}") + "\n")
     f.close()
 
     # Define the model trainer
     trainer = Trainer(
-        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE, log_dir, args.TSCNN
+        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE, log_dir, args.TSCNN, args.mode
     )
 
     # Use the trainer to train the model
@@ -412,7 +410,8 @@ class Trainer:
         summary_writer: SummaryWriter,
         device: torch.device,
         log_dir: str,
-        TSCNN: str,
+        TSCNN: bool,
+        mode: str,
     ):
         self.model = model.to(device)
         self.device = device
@@ -424,6 +423,7 @@ class Trainer:
         self.step = 0
         self.log_dir = log_dir
         self.TSCNN = TSCNN
+        self.mode = mode
 
     def train(
         self,
@@ -436,51 +436,62 @@ class Trainer:
         # Setting model to training mode
         self.model.train()
 
+        # Defining list of results for each epoch
+        results_epoch = {}
+
         # Main training loop
         for epoch in range(start_epoch, epochs):
             self.model.train()
 
-            # Extracting requred data from loader
-            data_load_start_time = time.time()
-            for batch, labels, fname in self.train_loader:
-                batch = batch.to(self.device)
-                labels = labels.to(self.device)
-                data_load_end_time = time.time()
+            # Remove training when in TSCNN mode
+            if not self.TSCNN:
 
-                # Compute the forward pass of the model
-                logits = self.model.forward(batch)
-
-                # Calculate the loss of the forward pass
-                loss = self.criterion(logits, labels)
-
-                # Implement backpropogation
-                loss.backward()
-
-                # Update the optimiser parameters and set the update grads to zero again
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-
-                # Disabling autograd when calculationg the accuracy
-                with torch.no_grad():
-                    preds = logits.argmax(-1)
-                    accuracy = compute_accuracy(labels, preds)
-
-                # Writing to logs and printing out the progress
-                data_load_time = data_load_end_time - data_load_start_time
-                step_time = time.time() - data_load_end_time
-                if ((self.step + 1) % log_frequency) == 0:
-                    self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
-                if ((self.step + 1) % print_frequency) == 0:
-                    self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
-
-                # Update loop params for next batch
-                self.step += 1
+                # Extracting requred data from loader
                 data_load_start_time = time.time()
+                for batch, labels, fname in self.train_loader:
+                    batch = batch.to(self.device)
+                    labels = labels.to(self.device)
+                    data_load_end_time = time.time()
+
+                    # Compute the forward pass of the model
+                    logits = self.model.forward(batch)
+
+                    # Calculate the loss of the forward pass
+                    loss = self.criterion(logits, labels)
+
+                    # Implement backpropogation
+                    loss.backward()
+
+                    # Update the optimiser parameters and set the update grads to zero again
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                    # Disabling autograd when calculationg the accuracy
+                    with torch.no_grad():
+                        preds = logits.argmax(-1)
+                        accuracy = compute_accuracy(labels, preds)
+
+                    # Writing to logs and printing out the progress
+                    data_load_time = data_load_end_time - data_load_start_time
+                    step_time = time.time() - data_load_end_time
+                    if ((self.step + 1) % log_frequency) == 0:
+                        self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
+                    if ((self.step + 1) % print_frequency) == 0:
+                        self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
+
+                    # Update loop params for next batch
+                    self.step += 1
+                    data_load_start_time = time.time()
 
             # Write to summary writer at the end of each epoch
             self.summary_writer.add_scalar("epoch", epoch, self.step)
             if ((epoch + 1) % val_frequency) == 0:
-                self.validate(epoch, epochs, self.log_dir)
+                results_epoch[epoch] = self.validate(epoch, epochs, self.log_dir)
+
+        # Exporting data
+        if not self.TSCNN:
+            pickle.dump(results_epoch, open("TSCNN_store_" + self.mode + ".pkl", "wb"))
+
 
 
     # Function used to print the progress
@@ -522,16 +533,20 @@ class Trainer:
         results = {"preds": [], "labels": [], "logits": []}
         total_loss = 0
 
-        # Loading data from previous run to combine for TSCNN
-        if self.TSCNN == "MC":
-            results_prev = pickle.load(open("TSCNN_store.pkl", "rb"))
+
+        # Loading data from previous run, set counter and defining softmax to combine for TSCNN
+        if self.TSCNN:
+            results_epoch_LMC = pickle.load(open("TSCNN_store_LMC.pkl", "rb"))
+            results_epoch_MC = pickle.load(open("TSCNN_store_MC.pkl", "rb"))
+            counter = 0
+            smax = nn.Softmax(dim=-1)
 
         # Put model in validation mode
         self.model.eval()
 
         # No need to track gradients for validation, we're not optimizing.
         with torch.no_grad():
-            for i, (batch, labels, fname) in enumerate(self.val_loader):
+            for batch, labels, fname in self.val_loader:
 
                 # Shifting batch and labels to appropriate device for efficiency
                 batch = batch.to(self.device)
@@ -545,6 +560,21 @@ class Trainer:
                 fname_logits = fname_logits.to(self.device)
                 fname_labels = fname_labels.to(self.device)
 
+                # Combining saved LMC and current MC logits for TSCNN, including some sanity checks
+                if self.TSCNN:
+                    combined_logits = []
+                    if len(fname_logits) != len(fname_labels):
+                        print("ERROR: Incorrect lengths of logit and label arrays, sanity check failed!")
+                    for fname_logit, fname_label in zip(fname_logits, fname_labels):
+                        if fname_label != results_epoch_LMC[epoch]["labels"][counter] or fname_label != results_epoch_MC[epoch]["labels"][counter]:
+                            print("ERROR: Incorrect label, sanity check failed!")
+                        combined_logits.append(np.array(smax(results_epoch_LMC[epoch]["logits"][counter]).cpu() + smax(results_epoch_MC[epoch]["logits"][counter]).cpu()))
+                        counter += 1
+
+                    # Overwriting logits with new combined logits and preparing the tensor
+                    fname_logits = (torch.Tensor(combined_logits).type(torch.float)).to(self.device)
+
+
                 # Calculating loss with new logits and labels
                 loss = self.criterion(fname_logits, fname_labels)
                 total_loss += loss.item()
@@ -553,17 +583,9 @@ class Trainer:
                 preds = fname_logits.argmax(dim=-1).cpu().numpy()
 
                 # Appending results
-                m = nn.Softmax(dim=-1)
-                results["logits"].extend(list(m(fname_logits)))
+                results["logits"].extend(list(fname_logits))
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(fname_labels.cpu().numpy()))
-
-        # Export list for TSCNN combining
-        if self.TSCNN == "LMC":
-            pickle.dump(results, open("TSCNN_store.pkl", "wb"))
-        elif self.TSCNN == "MC":
-            results_old = pickle.load(open("TSCNN_store.pkl", "rb"))
-            print("Sanity-check on batch order: " + str(np.array_equal(results["labels"],results_old["labels"])))
 
         # Find the overall accuracy of the model
         accuracy = compute_accuracy(
@@ -575,6 +597,9 @@ class Trainer:
             np.array(results["labels"]), np.array(results["preds"])
         )
 
+        # Find the average class accuracy
+        class_accuracy_avg = sum(class_accuracy)/len(class_accuracy)
+
         # Compute the average loss
         average_loss = total_loss / len(self.val_loader)
 
@@ -582,6 +607,11 @@ class Trainer:
         self.summary_writer.add_scalars(
                 "accuracy",
                 {"test": accuracy},
+                self.step
+        )
+        self.summary_writer.add_scalars(
+                "average_class",
+                {"test": class_accuracy_avg},
                 self.step
         )
         self.summary_writer.add_scalars(
@@ -594,20 +624,21 @@ class Trainer:
         self.model.train()
 
         # Print the progress & exporting the softmaxed logits and labels
+        display_text = f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}\nclass_avg: {class_accuracy_avg}"
         if (epoch+1) == epochs:
             f = open("logs/accuracy.md", "a")
             f.write(log_dir + "\n")
-            f.write(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}\n\n")
+            f.write(display_text)
             f.close()
-        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}, class_accuracy: {class_accuracy}")
+        print(display_text)
+        return results
 
 # Function for averaging the logits and proucing new labels from old
 def orderbyfname(labels,fname,logits):
-    # fname_set = [list(x).sort() for x in set(fname)]
     fname_set = sorted(set(fname))
     new_logits = []
     new_labels = []
-    for name in fname_set:
+    for iter,name in enumerate(fname_set):
         indices = np.where(np.array(fname)==name)[0]
         sum = np.zeros(10)
         for i in indices:
@@ -615,6 +646,7 @@ def orderbyfname(labels,fname,logits):
         sum = sum/len(indices)
         new_logits.append(sum)
         new_labels.append(labels[indices[0]])
+
     return torch.Tensor(new_logits).type(torch.float), torch.Tensor(new_labels).type(torch.long)
 
 # Function for computing the overall accuracy of the model
@@ -654,7 +686,7 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         from getting logged to the same TB log directory (which you can't easily
         untangle in TB).
     """
-    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_optim={args.optimiser}_decay={args.weight_decay}_lr={args.learning_rate}_momentum={args.momentum}_mode={args.mode}_run_')
+    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_optim={args.optimiser}_decay={args.weight_decay}_lr={args.learning_rate}_momentum={args.momentum}_mode=' + ("TSCNN" if args.TSCNN else args.mode) + '_run_')
     i = 0
     while i < 1000:
         tb_log_dir = args.log_dir / (tb_log_dir_prefix + str(i))
