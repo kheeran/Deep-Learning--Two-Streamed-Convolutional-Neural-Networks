@@ -4,11 +4,15 @@ Use more pooling layers - can't until the reached the benchmark
 
 Confirm testing is being done right. validation with fnames - DONE
 
-Implement the combining of data streams for TSCNN
+Implement the combining of data streams for TSCNN - DONE
  - use pickle to store the logits.
  - load the logits and softmax them
  - find the average
  - calculate TSCNN
+
+TSCNN
+Make it so the same MC and LMC values are used for the calculation. Use if statements to remove unnecessary code on a TSCNN run
+
 
 Maybe, implement them simultaneously and get graphs for the accuracy, to plot LMC, MC and TSCNN on the same accuracy and loss graph
 
