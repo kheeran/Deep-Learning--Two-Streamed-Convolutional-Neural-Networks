@@ -41,9 +41,9 @@ class UrbanSound8KDataset(data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
-dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
+# dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
 
-print((dataset_train_LMC.__getitem__(0)[2]))
+# print((dataset_train_LMC.__getitem__(0)[2]))
 
 # labels = np.zeros((10,1))
 # print(labels)
@@ -51,3 +51,8 @@ print((dataset_train_LMC.__getitem__(0)[2]))
 #     labels[dataset_train_LMC.__getitem__(i)[1]] += 1
 #
 # print(labels)
+
+LMC = pickle.load(open("./TSCNN_store_LMC.pkl", 'rb'))
+MC = pickle.load(open("./TSCNN_store_MC.pkl", 'rb'))
+LMC = LMC.cpu()
+MC = MC.cpu()
