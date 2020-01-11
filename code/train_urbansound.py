@@ -492,7 +492,7 @@ class Trainer:
         if not self.TSCNN:
             pickle.dump(results_epoch, open("TSCNN_store_" + self.mode + ".pkl", "wb"))
         else:
-            pickle.dump(results_epoch, open("TSCNN_store_" + "TSCNN" + ".pkl", "wb"))
+            pickle.dump(results_epoch, open("TSCNN_store_" + "TSCNN_Final" + ".pkl", "wb"))
 
     # Function used to print the progress
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
@@ -536,8 +536,8 @@ class Trainer:
 
         # Loading data from previous run, set counter and defining softmax to combine for TSCNN
         if self.TSCNN:
-            results_epoch_LMC = pickle.load(open("TSCNN_store_LMC.pkl", "rb"))
-            results_epoch_MC = pickle.load(open("TSCNN_store_MC.pkl", "rb"))
+            results_epoch_LMC = pickle.load(open("TSCNN_store_LMC_Final.pkl", "rb"))
+            results_epoch_MC = pickle.load(open("TSCNN_store_MC_Final.pkl", "rb"))
             counter = 0
             smax = nn.Softmax(dim=-1)
 
