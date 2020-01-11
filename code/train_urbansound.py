@@ -491,8 +491,8 @@ class Trainer:
         # Exporting data
         if not self.TSCNN:
             pickle.dump(results_epoch, open("TSCNN_store_" + self.mode + ".pkl", "wb"))
-
-
+        else:
+            pickle.dump(results_epoch, open("TSCNN_store_" + "TSCNN" + ".pkl", "wb"))
 
     # Function used to print the progress
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
@@ -628,7 +628,7 @@ class Trainer:
         if (epoch+1) == epochs:
             f = open("logs/accuracy.md", "a")
             f.write(log_dir + "\n")
-            f.write(display_text)
+            f.write(display_text + "\n\n")
             f.close()
         print(display_text)
         return results
