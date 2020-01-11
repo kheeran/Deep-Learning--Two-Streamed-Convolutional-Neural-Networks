@@ -2,6 +2,8 @@ import torch
 from torch.utils import data
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt
+from random import randint
 
 class UrbanSound8KDataset(data.Dataset):
     def __init__(self, dataset_path, mode):
@@ -22,6 +24,16 @@ class UrbanSound8KDataset(data.Dataset):
             # Edit here to load and concatenate the neccessary features to
             # create the LMC feature
             LMC = np.concatenate((LM, C, SC, T), axis=0)
+            plt.imshow(LM)
+            plt.show()
+            plt.imshow(MFCC)
+            plt.show()
+            plt.imshow(C)
+            plt.show()
+            plt.imshow(SC)
+            plt.show()
+            plt.imshow(T)
+            plt.show()
             feature = torch.from_numpy(LMC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MC':
             # Edit here to load and concatenate the neccessary features to
@@ -41,18 +53,25 @@ class UrbanSound8KDataset(data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
-# dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
+dataset_train_LMC = UrbanSound8KDataset("./UrbanSound8K_test.pkl", "LMC")
 
-# print((dataset_train_LMC.__getitem__(0)[2]))
-
+# for i in range (0,20):
+#     a = randint(0,5395)
+#     print (a)
+#     plt.imshow(dataset_train_LMC.__getitem__(a)[0].squeeze())
+#     plt.hlines(59, 0, 40)
+#     plt.hlines(66, 0, 40)
+#     plt.hlines(71, 0, 40)
+#     plt.show()
+dataset_train_LMC.__getitem__(45)[0]
 # labels = np.zeros((10,1))
 # print(labels)
 # for i in range(5395):
 #     labels[dataset_train_LMC.__getitem__(i)[1]] += 1
 #
 # print(labels)
-
-LMC = pickle.load(open("./TSCNN_store_LMC.pkl", 'rb'))
-MC = pickle.load(open("./TSCNN_store_MC.pkl", 'rb'))
-LMC = LMC.cpu()
-MC = MC.cpu()
+#
+# LMC = pickle.load(open("./TSCNN_store_LMC.pkl", 'rb'))
+# MC = pickle.load(open("./TSCNN_store_MC.pkl", 'rb'))
+# LMC = LMC.cpu()
+# MC = MC.cpu()
