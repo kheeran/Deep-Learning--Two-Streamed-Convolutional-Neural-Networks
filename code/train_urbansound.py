@@ -235,7 +235,7 @@ class UrbanSound8KDataset(data.Dataset):
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
 
-        return feature, label, fname
+        return feature, label, fname, index
 
     def __len__(self):
         return len(self.dataset)
@@ -443,34 +443,34 @@ class Trainer:
         for epoch in range(start_epoch, epochs):
             self.model.train()
 
+
+            # # Remove training when in TSCNN mode
+            # if not self.TSCNN:
+
             # Extracting requred data from loader
             data_load_start_time = time.time()
-            for batch, labels, fname in self.train_loader:
+            for batch, labels, fname, index in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
 
-                # Remove training when in TSCNN mode
-                if not self.TSCNN:
+                # Compute the forward pass of the model
+                logits = self.model.forward(batch)
 
+                # Calculate the loss of the forward pass
+                loss = self.criterion(logits, labels)
 
-                    # Compute the forward pass of the model
-                    logits = self.model.forward(batch)
+                # Implement backpropogation
+                loss.backward()
 
-                    # Calculate the loss of the forward pass
-                    loss = self.criterion(logits, labels)
+                # Update the optimiser parameters and set the update grads to zero again
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
-                    # Implement backpropogation
-                    loss.backward()
-
-                    # Update the optimiser parameters and set the update grads to zero again
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
-
-                    # Disabling autograd when calculationg the accuracy
-                    with torch.no_grad():
-                        preds = logits.argmax(-1)
-                        accuracy = compute_accuracy(labels, preds)
+                # Disabling autograd when calculationg the accuracy
+                with torch.no_grad():
+                    preds = logits.argmax(-1)
+                    accuracy = compute_accuracy(labels, preds)
 
                 # Writing to logs and printing out the progress
                 data_load_time = data_load_end_time - data_load_start_time
@@ -531,7 +531,7 @@ class Trainer:
 
     # Function used to validate the model
     def validate(self, epoch, epochs, log_dir):
-        results = {"preds": [], "labels": [], "logits": []}
+        results = {"preds": [], "labels": [], "logits": [], "indices": []}
         total_loss = 0
 
 
@@ -547,7 +547,7 @@ class Trainer:
 
         # No need to track gradients for validation, we're not optimizing.
         with torch.no_grad():
-            for batch, labels, fname in self.val_loader:
+            for batch, labels, fname, index in self.val_loader:
 
                 # Shifting batch and labels to appropriate device for efficiency
                 batch = batch.to(self.device)
@@ -557,7 +557,7 @@ class Trainer:
                 logits = self.model(batch)
 
                 # Averaging the logits by fname and making the new labels
-                fname_logits, fname_labels = orderbyfname(labels,fname,logits)
+                fname_logits, fname_labels, fname_indices = orderbyfname(labels,fname,logits, index)
                 fname_logits = fname_logits.to(self.device)
                 fname_labels = fname_labels.to(self.device)
 
@@ -587,6 +587,7 @@ class Trainer:
                 results["logits"].extend(list(fname_logits))
                 results["preds"].extend(list(preds))
                 results["labels"].extend(list(fname_labels.cpu().numpy()))
+                results["indices"].extend(list(fname_indices))
 
         # Find the overall accuracy of the model
         accuracy = compute_accuracy(
@@ -635,20 +636,32 @@ class Trainer:
         return results
 
 # Function for averaging the logits and proucing new labels from old
-def orderbyfname(labels,fname,logits):
+def orderbyfname(labels,fname,logits, index):
     fname_set = sorted(set(fname))
     new_logits = []
     new_labels = []
+    new_indices = []
     for iter,name in enumerate(fname_set):
+
+        # Determining the indices of the batch which are from the same filename
         indices = np.where(np.array(fname)==name)[0]
         sum = np.zeros(10)
+        index_store_temp = []
+
+        # Using the indices to average the logits
         for i in indices:
             sum += np.array(logits[i].cpu())
+            index_store_temp.append(index[i]) # qualitative analysis
         sum = sum/len(indices)
+
+        # appending new data
         new_logits.append(sum)
         new_labels.append(labels[indices[0]])
 
-    return torch.Tensor(new_logits).type(torch.float), torch.Tensor(new_labels).type(torch.long)
+        # Storing the actual test data indices for the qualitative analysis
+        new_indices.append(index_store_temp)
+
+    return torch.Tensor(new_logits).type(torch.float), torch.Tensor(new_labels).type(torch.long), new_indices
 
 # Function for computing the overall accuracy of the model
 def compute_accuracy(
@@ -668,7 +681,6 @@ def compute_class_accuracy(labels: Union[torch.Tensor, np.ndarray], preds: Union
     class_accuracy = []
     for class_label in range(0,class_count):
         class_labels = np.where(labels == class_label, class_label, class_label)
-        # twos = 2*np.ones(class_labels.shape)
         class_accuracy.append(float(np.logical_and((preds == class_labels),(labels == class_labels)).sum())*100 / np.array(labels == class_labels).sum())
     return class_accuracy
 
