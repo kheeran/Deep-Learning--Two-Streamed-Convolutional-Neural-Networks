@@ -443,15 +443,16 @@ class Trainer:
         for epoch in range(start_epoch, epochs):
             self.model.train()
 
-            # Remove training when in TSCNN mode
-            if not self.TSCNN:
+            # Extracting requred data from loader
+            data_load_start_time = time.time()
+            for batch, labels, fname in self.train_loader:
+                batch = batch.to(self.device)
+                labels = labels.to(self.device)
+                data_load_end_time = time.time()
 
-                # Extracting requred data from loader
-                data_load_start_time = time.time()
-                for batch, labels, fname in self.train_loader:
-                    batch = batch.to(self.device)
-                    labels = labels.to(self.device)
-                    data_load_end_time = time.time()
+                # Remove training when in TSCNN mode
+                if not self.TSCNN:
+
 
                     # Compute the forward pass of the model
                     logits = self.model.forward(batch)
@@ -471,17 +472,17 @@ class Trainer:
                         preds = logits.argmax(-1)
                         accuracy = compute_accuracy(labels, preds)
 
-                    # Writing to logs and printing out the progress
-                    data_load_time = data_load_end_time - data_load_start_time
-                    step_time = time.time() - data_load_end_time
-                    if ((self.step + 1) % log_frequency) == 0:
-                        self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
-                    if ((self.step + 1) % print_frequency) == 0:
-                        self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
+                # Writing to logs and printing out the progress
+                data_load_time = data_load_end_time - data_load_start_time
+                step_time = time.time() - data_load_end_time
+                if ((self.step + 1) % log_frequency) == 0:
+                    self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
+                if ((self.step + 1) % print_frequency) == 0:
+                    self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
 
-                    # Update loop params for next batch
-                    self.step += 1
-                    data_load_start_time = time.time()
+                # Update loop params for next batch
+                self.step += 1
+                data_load_start_time = time.time()
 
             # Write to summary writer at the end of each epoch
             self.summary_writer.add_scalar("epoch", epoch, self.step)
