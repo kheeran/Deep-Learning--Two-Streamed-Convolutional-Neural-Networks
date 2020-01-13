@@ -100,7 +100,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--weight-decay",
-    default=0.00001,
+    default=0.01,
     type=float,
     help="The L2 regularisation decay parameter"
 )
