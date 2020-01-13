@@ -1,0 +1,12 @@
+usage: train_urbansound.py [-h] [--log-dir LOG_DIR]
+                           [--learning-rate LEARNING_RATE]
+                           [--batch-size BATCH_SIZE] [--epochs EPOCHS]
+                           [--val-frequency VAL_FREQUENCY]
+                           [--log-frequency LOG_FREQUENCY]
+                           [--print-frequency PRINT_FREQUENCY]
+                           [-j WORKER_COUNT] [--momentum MOMENTUM]
+                           [--dropout DROPOUT] [--mode MODE]
+                           [--optimiser OPTIMISER]
+                           [--weight-decay WEIGHT_DECAY] [--TSCNN]
+train_urbansound.py: error: unrecognized arguments: -TSCNN
+Using CUDA...
