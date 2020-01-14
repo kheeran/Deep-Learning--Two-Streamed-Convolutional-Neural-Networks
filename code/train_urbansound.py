@@ -111,7 +111,7 @@ parser.add_argument(
 )
 
 
-class DataShape(NamedTuple): # 45*85*1
+class DataShape(NamedTuple):
     height: int
     width: int
     channels: int
@@ -222,7 +222,7 @@ class UrbanSound8KDataset(data.Dataset):
         SC = self.dataset[index]["features"]["spectral_contrast"]
         T = self.dataset[index]["features"]["tonnetz"]
 
-        # Appropriately prepare the data given the selected mode
+        # Appropriately prepare the data given the selected mode, based on the specifications of the paper
         if self.mode == 'LMC':
             LMC = np.concatenate((LM, C, SC, T), axis=0)
             feature = torch.from_numpy(LMC.astype(np.float32)).unsqueeze(0)
@@ -240,6 +240,7 @@ class UrbanSound8KDataset(data.Dataset):
     def __len__(self):
         return len(self.dataset)
 
+# The architecture class
 class CNN(nn.Module):
     def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float, mode: str):
         super().__init__()
@@ -308,7 +309,7 @@ class CNN(nn.Module):
         )
 
         # Defining the fourth convolutional layer & initialising its weights using Kaiming
-        # Could use Max Pooling for the last layer, but probably more likely to be stride (from the paper)
+        # Could use Max Pooling for the last layer, but probably more likely to be stride (based on the paper)
         self.conv4 = nn.Conv2d(
             in_channels=64,
             out_channels=64,
@@ -332,6 +333,7 @@ class CNN(nn.Module):
         )
 
         # Defining the first fully connected layer & initialising the weights using Kaiming
+        # The size of the data for MLMC is larger and requires a larger fully connected layer
         if self.mode == "MLMC":
             self.fc1 = nn.Linear(26048, 1024)
         else:
@@ -398,7 +400,7 @@ class CNN(nn.Module):
         if hasattr(layer, "weight"):
             nn.init.kaiming_normal_(layer.weight)
 
-
+# Class for the execution of the main training loop
 class Trainer:
     def __init__(
         self,
@@ -443,34 +445,37 @@ class Trainer:
         for epoch in range(start_epoch, epochs):
             self.model.train()
 
-
-            # # Remove training when in TSCNN mode
-            # if not self.TSCNN:
-
-            # Extracting requred data from loader
+            # Extracting required data from loader
             data_load_start_time = time.time()
             for batch, labels, fname, index in self.train_loader:
                 batch = batch.to(self.device)
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
 
-                # Compute the forward pass of the model
-                logits = self.model.forward(batch)
+                # Remove training when in TSCNN mode
+                if not self.TSCNN:
 
-                # Calculate the loss of the forward pass
-                loss = self.criterion(logits, labels)
+                    # Compute the forward pass of the model
+                    logits = self.model.forward(batch)
 
-                # Implement backpropogation
-                loss.backward()
+                    # Calculate the loss of the forward pass
+                    loss = self.criterion(logits, labels)
 
-                # Update the optimiser parameters and set the update grads to zero again
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+                    # Implement backpropogation
+                    loss.backward()
 
-                # Disabling autograd when calculationg the accuracy
-                with torch.no_grad():
-                    preds = logits.argmax(-1)
-                    accuracy = compute_accuracy(labels, preds)
+                    # Update the optimiser parameters and set the update grads to zero again
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                    # Disabling autograd when calculationg the accuracy
+                    with torch.no_grad():
+                        preds = logits.argmax(-1)
+                        accuracy = compute_accuracy(labels, preds)
+                else:
+                    # Placeholders for logger when in TSCNN mode
+                    accuracy = 0
+                    loss = 0
 
                 # Writing to logs and printing out the progress
                 data_load_time = data_load_end_time - data_load_start_time
@@ -534,13 +539,12 @@ class Trainer:
         results = {"preds": [], "labels": [], "logits": [], "indices": []}
         total_loss = 0
 
-
-        # Loading data from previous run, set counter and defining softmax to combine for TSCNN
+        # Loading data from previous runs and defining softmax to combine for TSCNN
         if self.TSCNN:
             results_epoch_LMC = pickle.load(open("TSCNN_store_LMC_Final.pkl", "rb"))
             results_epoch_MC = pickle.load(open("TSCNN_store_MC_Final.pkl", "rb"))
-            counter = 0
             smax = nn.Softmax(dim=-1)
+            counter = 0  # used to load the appropriate logits from the stored data
 
         # Put model in validation mode
         self.model.eval()
@@ -565,10 +569,10 @@ class Trainer:
                 if self.TSCNN:
                     combined_logits = []
                     if len(fname_logits) != len(fname_labels):
-                        print("ERROR: Incorrect lengths of logit and label arrays, sanity check failed!")
+                        print("ERROR: Incorrect lengths of logit and label arrays, sanity check failed!") # Sanity check
                     for fname_logit, fname_label in zip(fname_logits, fname_labels):
                         if fname_label != results_epoch_LMC[epoch]["labels"][counter] or fname_label != results_epoch_MC[epoch]["labels"][counter]:
-                            print("ERROR: Incorrect label, sanity check failed!")
+                            print("ERROR: Incorrect label, sanity check failed!") # Sanity check
                         combined_logits.append(np.array(smax(results_epoch_LMC[epoch]["logits"][counter]).cpu() + smax(results_epoch_MC[epoch]["logits"][counter]).cpu()))
                         counter += 1
 
