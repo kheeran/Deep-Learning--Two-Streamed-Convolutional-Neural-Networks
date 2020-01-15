@@ -14,6 +14,7 @@ from torch.optim .optimizer import Optimizer
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from torch.utils import data
+from random import randint
 
 import argparse
 from pathlib import Path
@@ -109,7 +110,11 @@ parser.add_argument(
     action = 'store_true',
     help="Parameter for dealing with TSCNN combining of logits"
 )
-
+parser.add_argument(
+    "--improvements",
+    action = 'store_true',
+    help="Parameter for adding improvements to the architecture CNN"
+)
 
 class DataShape(NamedTuple):
     height: int
@@ -129,8 +134,9 @@ else:
 def main(args):
 
     # Load and prepare the data
-    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", args.mode)
-    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", args.mode)
+    istrain = True
+    train_dataset = UrbanSound8KDataset("./UrbanSound8K_train.pkl", istrain, args.mode, args.improvements)
+    test_dataset = UrbanSound8KDataset("./UrbanSound8K_test.pkl", not istrain, args.mode, args.improvements)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         shuffle=True,
@@ -152,7 +158,7 @@ def main(args):
     data_width = train_dataset.__getitem__(0)[0].shape[2]
 
     # Define the CNN model
-    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout, mode=args.mode)
+    model = CNN(height=data_height, width=data_width, channels=data_channels, class_count=10, dropout=args.dropout, mode=args.mode, improvements=args.improvements)
 
     # Running Torch Summary to check the architecture
     # summary(model, (data_channels,data_height,data_width))
@@ -207,11 +213,13 @@ def main(args):
 
 # The Dataset class
 class UrbanSound8KDataset(data.Dataset):
-    def __init__(self, dataset_path, mode):
+    def __init__(self, dataset_path, istrain, mode, improvements):
 
         # Load the dataset
         self.dataset = pickle.load(open(dataset_path, 'rb'))
         self.mode = mode
+        self.improvements = improvements
+        self.istrain = istrain
 
     def __getitem__(self, index):
 
@@ -225,12 +233,18 @@ class UrbanSound8KDataset(data.Dataset):
         # Appropriately prepare the data given the selected mode, based on the specifications of the paper
         if self.mode == 'LMC':
             LMC = np.concatenate((LM, C, SC, T), axis=0)
+            if self.improvements and self.istrain:
+                LMC = LMC*randint(1,4) # Random augmentation of the training data
             feature = torch.from_numpy(LMC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MC':
             MC = np.concatenate((MFCC, C, SC, T), axis=0)
+            if self.improvements and self.istrain:
+                MC = MC*randint(1,4) # Random augmentation of the training data
             feature = torch.from_numpy(MC.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MLMC':
             MLMC = np.concatenate((MFCC, LM, C, SC, T), axis=0)
+            if self.improvements and self.istrain:
+                MLMC = MLMC*randint(1,4) # Random augmentation of the training data
             feature = torch.from_numpy(MLMC.astype(np.float32)).unsqueeze(0)
         label = self.dataset[index]['classID']
         fname = self.dataset[index]['filename']
@@ -242,13 +256,14 @@ class UrbanSound8KDataset(data.Dataset):
 
 # The architecture class
 class CNN(nn.Module):
-    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float, mode: str):
+    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: float, mode: str, improvements: bool):
         super().__init__()
 
-        # Define data shape and number of classes
+        # Define some global class variables
         self.input_shape = DataShape(height=height, width=width, channels=channels)
         self.class_count = class_count
         self.mode = mode
+        self.improvements = improvements
 
         # Defining the first convolutional layer & initialising its weights using Kaiming
         self.conv1 = nn.Conv2d(
@@ -368,6 +383,8 @@ class CNN(nn.Module):
         x = self.pool2(x)
 
         # Implementing the third conv hidden layer
+        # if self.improvements:
+        #     x = self.dropout(x)
         x = self.conv3(x)
         x = self.bnorm3(x)
         x = F.relu(x)
@@ -452,30 +469,23 @@ class Trainer:
                 labels = labels.to(self.device)
                 data_load_end_time = time.time()
 
-                # Remove training when in TSCNN mode
-                if not self.TSCNN:
+                # Compute the forward pass of the model
+                logits = self.model.forward(batch)
 
-                    # Compute the forward pass of the model
-                    logits = self.model.forward(batch)
+                # Calculate the loss of the forward pass
+                loss = self.criterion(logits, labels)
 
-                    # Calculate the loss of the forward pass
-                    loss = self.criterion(logits, labels)
+                # Implement backpropogation
+                loss.backward()
 
-                    # Implement backpropogation
-                    loss.backward()
+                # Update the optimiser parameters and set the update grads to zero again
+                self.optimizer.step()
+                self.optimizer.zero_grad()
 
-                    # Update the optimiser parameters and set the update grads to zero again
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
-
-                    # Disabling autograd when calculationg the accuracy
-                    with torch.no_grad():
-                        preds = logits.argmax(-1)
-                        accuracy = compute_accuracy(labels, preds)
-                else:
-                    # Placeholders for logger when in TSCNN mode
-                    accuracy = 0
-                    loss = 0
+                # Disabling autograd when calculationg the accuracy
+                with torch.no_grad():
+                    preds = logits.argmax(-1)
+                    accuracy = compute_accuracy(labels, preds)
 
                 # Writing to logs and printing out the progress
                 data_load_time = data_load_end_time - data_load_start_time
@@ -703,7 +713,7 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         from getting logged to the same TB log directory (which you can't easily
         untangle in TB).
     """
-    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_optim={args.optimiser}_decay={args.weight_decay}_lr={args.learning_rate}_momentum={args.momentum}_mode=' + ("TSCNN" if args.TSCNN else args.mode) + '_run_')
+    tb_log_dir_prefix = (f'CNN_bn_epochs={args.epochs}_dropout={args.dropout}_bs={args.batch_size}_optim={args.optimiser}_decay={args.weight_decay}_lr={args.learning_rate}_momentum={args.momentum}_mode=' + ("TSCNN" if args.TSCNN else args.mode) + ("_improvements_" if args.improvements else "") +'_run_')
     i = 0
     while i < 1000:
         tb_log_dir = args.log_dir / (tb_log_dir_prefix + str(i))
